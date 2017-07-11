@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="ISO-8859-1">
+<title>YouTellMe</title>
+</head>
+<body>
+
+<h1> Dashboard</h1>
+
+<form action="/showSurvey" method="POST" enctype="multipart/form-data">
+	<input type="submit" value="List of Surveys"/>
+</form>
+
+<form action="/viewSurvey" method="POST" enctype="multipart/form-data">
+	<input type="submit" value="View Survey"/>
+</form>
+
+{% if response_value %}
+<h1>{{ response_value }}</h1>
+{% endif %}
+
+
+
+</body>
+</html>
