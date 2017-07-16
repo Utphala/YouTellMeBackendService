@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, redirect, url_for, session
+from flask import Flask, request, jsonify, redirect, url_for, session, Response
 from flask.templating import render_template
 from flask_oauth import OAuth
 import MySQLdb
@@ -32,12 +32,15 @@ google = oauth.remote_app('google',
                           consumer_key=GOOGLE_CLIENT_ID,
                           consumer_secret=GOOGLE_CLIENT_SECRET)
 
-@app.route('/')
+@app.route("/")
 def index():
-    access_token = session.get('access_token')
-    if access_token is None:
-        return redirect(url_for('login'))
+    return "Hello World!"
 
+@app.route('/disabled')
+def disabledIndex():
+    # access_token = session.get('access_token')
+    # if access_token is None:
+    #     return redirect(url_for('login'))
     access_token = access_token[0]
     from urllib2 import Request, urlopen, URLError
 
@@ -66,14 +69,14 @@ def login():
 
 
 @app.route(REDIRECT_URI)
-@google.authorized_handler
+# @google.authorized_handler
 def authorized(resp):
     access_token = resp['access_token']
     session['access_token'] = access_token, ''
     return redirect(url_for('list_surveys'))
 
 
-@google.tokengetter
+# @google.tokengetter
 def get_access_token():
     return session.get('access_token')
 
@@ -86,7 +89,7 @@ def loadUser(data):
     conn.close()
 
 @app.route("/list_surveys",methods=['GET','POST'])
-@google.authorized_handler
+# @google.authorized_handler
 def list_surveys(resp):
     query_to_excute = "SELECT content FROM youTellMeDB.surveys";
     conn=MySQLdb.connect('127.0.0.1','root','root','youTellMeDB')
@@ -104,7 +107,9 @@ def get_survey(sid):
     cursor= conn.cursor()
     cursor.execute(query_to_excute,sid);
     survey = cursor.fetchone()
-    return json.dumps(survey)
+    return Response(response=survey,
+                    status=200,
+                    mimetype="application/json")
 
 @app.route("/submit_survey", methods=["POST"])
 def submit():
