@@ -91,14 +91,22 @@ def loadUser(data):
 @app.route("/list_surveys",methods=['GET','POST'])
 # @google.authorized_handler
 def list_surveys(resp):
+    surveyList = []
     query_to_excute = "SELECT content FROM youTellMeDB.surveys";
     conn=MySQLdb.connect('127.0.0.1','root','root','youTellMeDB')
     cursor= conn.cursor()
     cursor.execute(query_to_excute);
-    surveys = cursor.fetchall()
+    resultSet = cursor.fetchall()
+
+    for res in resultSet:
+        res = jsonify(res)
+        json_data = json.loads(resultSet)
+        print json_data['Title']
+        #surveyList.append(res)
     cursor.close()
     conn.close()
-    return jsonify(surveys)
+    print resultSet[0]
+    return json.dumps(resultSet)
 
 @app.route("/get_survey/<sid>", methods=["GET", "POST"])
 def get_survey(sid):
@@ -117,4 +125,4 @@ def submit():
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8080)
+    app.run(host='127.0.0.1', port=8081)
