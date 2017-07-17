@@ -1,112 +1,74 @@
 from flask import Flask, request, jsonify, redirect, url_for, session, Response
 from flask.templating import render_template
+import requests
 from flask_oauth import OAuth
 import MySQLdb
 import json
-# ClintID: 37779483905-mbehq3u75fg4ldo9jb3t9pg5t1ck83c2.apps.googleusercontent.com
-# Secret: DOf9Z2tv3mMkBvOOTyeroC-F
-
-GOOGLE_CLIENT_ID = '37779483905-mbehq3u75fg4ldo9jb3t9pg5t1ck83c2.apps.googleusercontent.com'
-GOOGLE_CLIENT_SECRET = 'DOf9Z2tv3mMkBvOOTyeroC-F'
-REDIRECT_URI = '/authorize'
-
-app = Flask(__name__, template_folder='templates')
-
-SECRET_KEY = 'development key'
-DEBUG = True
+from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
-app.debug = DEBUG
-app.secret_key = SECRET_KEY
-oauth = OAuth()
-
-google = oauth.remote_app('google',
-                          base_url='https://www.google.com/accounts/',
-                          authorize_url='https://accounts.google.com/o/oauth2/auth',
-                          request_token_url=None,
-                          request_token_params={'scope': 'https://www.googleapis.com/auth/userinfo.email',
-                                                'response_type': 'code'},
-                          access_token_url='https://accounts.google.com/o/oauth2/token',
-                          access_token_method='POST',
-                          access_token_params={'grant_type': 'authorization_code'},
-                          consumer_key=GOOGLE_CLIENT_ID,
-                          consumer_secret=GOOGLE_CLIENT_SECRET)
-
-@app.route("/")
+@app.route('/')
 def index():
-    return "Hello World!"
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+    else:
+        return "Welcome to YouTellMe Service!"
 
-@app.route('/disabled')
-def disabledIndex():
-    # access_token = session.get('access_token')
-    # if access_token is None:
-    #     return redirect(url_for('login'))
-    access_token = access_token[0]
-    from urllib2 import Request, urlopen, URLError
+@app.route('/register',methods=["POST"])
+def signup():
+    request_dict = request.get_json()
+    username=request_dict['user_name']
+    passwd=request_dict['password']
+    name=request_dict['fname']
+    role = "user"
 
-    headers = {'Authorization': 'OAuth '+access_token}
-    req = Request('https://www.googleapis.com/oauth2/v1/userinfo',
-                  None, headers)
-    try:
-        res = urlopen(req)
-    except URLError, e:
-        if e.code == 401:
-            # Unauthorized - bad token
-            session.pop('access_token', None)
-            return redirect(url_for('login'))
-        return res.read()
-    # Save user data
-    data = json.load(res)
-    loadUser(data)
-    return res.read()
-
-
-@app.route('/login')
-def login():
-    callback=url_for('authorized', _external=True)
-    return google.authorize(callback=callback)
-
-
-
-@app.route(REDIRECT_URI)
-# @google.authorized_handler
-def authorized(resp):
-    access_token = resp['access_token']
-    session['access_token'] = access_token, ''
-    return redirect(url_for('list_surveys'))
-
-
-# @google.tokengetter
-def get_access_token():
-    return session.get('access_token')
-
-def loadUser(data):
     conn=MySQLdb.connect('127.0.0.1','root','root','youTellMeDB')
     cursor= conn.cursor()
-    cursor.execute("INSERT IGNORE INTO youTellMeDB.Users (id, role, name) VALUES (%s, %s, %s)", (data['email'], 'user', data['name']));
+    cursor.execute("""INSERT IGNORE INTO youTellMeDB.Users VALUES(%s, %s, %s, %s)""",(username, role, name, generate_password_hash(passwd)))
     conn.commit()
     cursor.close()
     conn.close()
+    return Response(status=200)
+
+@app.route('/login',methods=['GET','POST'])
+def login():
+    username = request.form['user_name'];
+    passwd = request.form['password'];
+
+    query_to_excute = "SELECT user_id FROM youTellMeDB.Users WHERE id=%s";
+    conn=MySQLdb.connect('127.0.0.1','root','root','youTellMeDB')
+    cursor= conn.cursor()
+    cursor.execute(query_to_excute,username);
+    validUser = cursor.fetchall()
+    cursor.close()
+    conn.close()
+
+    if validUser and check_password(passwd):
+        session['user'] = username
+        session['logged_in'] = True
+
+        return Response(status=200)
+    else:
+        return Response(status=500)
 
 @app.route("/list_surveys",methods=['GET','POST'])
-# @google.authorized_handler
-def list_surveys(resp):
+def list_surveys():
     surveyList = []
-    query_to_excute = "SELECT content FROM youTellMeDB.surveys";
+    query_to_excute = "SELECT id,title FROM youTellMeDB.surveys";
     conn=MySQLdb.connect('127.0.0.1','root','root','youTellMeDB')
     cursor= conn.cursor()
     cursor.execute(query_to_excute);
     resultSet = cursor.fetchall()
 
     for res in resultSet:
-        res = jsonify(res)
-        json_data = json.loads(resultSet)
-        print json_data['Title']
-        #surveyList.append(res)
+        surveyListDict = {}
+        surveyListDict['id'] = str(res[0])
+        surveyListDict['title'] = res[1]
+        surveyList.append(surveyListDict)
+
     cursor.close()
     conn.close()
-    print resultSet[0]
-    return json.dumps(resultSet)
+    return jsonify(surveyList)
 
 @app.route("/get_survey/<sid>", methods=["GET", "POST"])
 def get_survey(sid):
@@ -115,14 +77,35 @@ def get_survey(sid):
     cursor= conn.cursor()
     cursor.execute(query_to_excute,sid);
     survey = cursor.fetchone()
+    cursor.close()
+    conn.close()
     return Response(response=survey,
                     status=200,
                     mimetype="application/json")
 
 @app.route("/submit_survey", methods=["POST"])
 def submit():
-    return
+    #currentUser =  session.get('user')
+    request_dict = request.get_json()
+    sid = request_dict['surveyID']
+    content = request_dict['responses']
+    currentUser = "utphala.p@gmail.com"
+
+    conn=MySQLdb.connect('127.0.0.1','root','root','youTellMeDB')
+    cursor= conn.cursor()
+    cursor.execute("""INSERT IGNORE INTO youTellMeDB.responses(user_id, survey_id, responses) VALUES( %s, %s, %s);""",(currentUser, int(sid), str(content)))
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    return Response(status=200)
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    session['logged_in'] = False
+    return Response(status=200)
 
 
 if __name__ == '__main__':
-    app.run(host='127.0.0.1', port=8081)
+    app.run(host='0.0.0.0', port=8081)
