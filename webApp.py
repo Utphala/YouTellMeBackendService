@@ -32,12 +32,8 @@ def signup():
     conn.close()
     return Response(status=200)
 
-@app.route('/login',methods=['GET','POST'])
-def login():
-    request_dict = request.get_json()
-    username = request_dict['user_name'];
-    passwd = request_dict['password'];
-
+@app.route('/login/<username>/<passwd>',methods=['GET','POST'])
+def login(username,passwd):
     conn=MySQLdb.connect('127.0.0.1','root','root','youTellMeDB')
     cursor= conn.cursor()
     cursor.execute("SELECT id,passwordHash FROM youTellMeDB.Users WHERE id=%s",[username]);
@@ -53,7 +49,7 @@ def login():
 
         return Response(status=200)
     else:
-        return Response(status=500)
+        return Response(status=401)
 
 @app.route("/list_surveys",methods=['GET','POST'])
 def list_surveys():
