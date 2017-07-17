@@ -7,10 +7,12 @@ import json
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
+app.secret_key="secret"
+
 @app.route('/')
 def index():
     if not session.get('logged_in'):
-        return redirect(url_for('login'))
+        return Response(status=500)
     else:
         return "Welcome to YouTellMe Service!"
 
@@ -32,18 +34,20 @@ def signup():
 
 @app.route('/login',methods=['GET','POST'])
 def login():
-    username = request.form['user_name'];
-    passwd = request.form['password'];
+    request_dict = request.get_json()
+    username = request_dict['user_name'];
+    passwd = request_dict['password'];
 
-    query_to_excute = "SELECT user_id FROM youTellMeDB.Users WHERE id=%s";
     conn=MySQLdb.connect('127.0.0.1','root','root','youTellMeDB')
     cursor= conn.cursor()
-    cursor.execute(query_to_excute,username);
-    validUser = cursor.fetchall()
+    cursor.execute("SELECT id,passwordHash FROM youTellMeDB.Users WHERE id=%s",[username]);
+    resultSet = cursor.fetchone()
+    validUser = resultSet[0]
+    hashPasswd = resultSet[1]
     cursor.close()
     conn.close()
 
-    if validUser and check_password(passwd):
+    if validUser and check_password_hash(hashPasswd,passwd):
         session['user'] = username
         session['logged_in'] = True
 
