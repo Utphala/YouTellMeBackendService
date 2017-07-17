@@ -85,11 +85,11 @@ def get_survey(sid):
 
 @app.route("/submit_survey", methods=["POST"])
 def submit():
-    #currentUser =  session.get('user')
+    currentUser =  session.get('user')
     request_dict = request.get_json()
     sid = request_dict['surveyID']
     content = request_dict['responses']
-    currentUser = "utphala.p@gmail.com"
+    #currentUser = "utphala.p@gmail.com"
 
     conn=MySQLdb.connect('127.0.0.1','root','root','youTellMeDB')
     cursor= conn.cursor()
